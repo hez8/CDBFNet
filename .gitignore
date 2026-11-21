@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+
+data/
+preprocess_data/
+results/
+log/
+
+*.log
+*.tmp
+

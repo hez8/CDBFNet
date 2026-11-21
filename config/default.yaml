@@ -1,0 +1,138 @@
+model:
+  n_channels: 3
+  k_bases: 20
+  encoder: convnext_tiny
+  pretrained_encoder: true
+  ablation:
+    independent_coefficients: false
+    direct_reflectance: false
+    single_lambertian: false
+    without_normals: false
+    without_visibility: false
+    direct_intrinsic: false
+
+whdr_head:
+  enabled: true
+  hidden_channels: 16
+  residual_scale: 0.1
+  ratio_delta: 0.10
+
+renderer:
+  dielectric: true
+  learnable_roughness: true
+  learnable_focal: true
+  spherical_light: true
+  pretrained_Hx: null
+  freeze_Hx: false
+
+training:
+  batch_size: 64
+  base_lr: 4.0e-4
+  epochs: 40
+  temperature_start: 1.0
+  temperature_end: 0.30
+  data_mix_ratio:
+    cgintrinsics: 3
+    hypersim: 2
+    iiw: 1
+    saw: 1
+  num_workers: 16
+  gpu_ids: [0, 1]
+  seed: 2021
+  grad_clip_norm: 1.0
+  use_amp: true
+
+phases:
+  phase1:
+    epochs: [1, 5]
+    active_losses: [mrae, entropy, rank, whdr_ce]
+    image_size: 256
+    batch_size: 64
+  phase2:
+    epochs: [6, 10]
+    active_losses: [mrae, entropy, normal, shading_regularization, saw_shading, rank, whdr_ce]
+    loss_warmup_epochs: 5
+    image_size: 256
+    batch_size: 64
+  phase3:
+    epochs: [11, 20]
+    active_losses: [mrae, entropy, normal, shading_regularization, saw_shading, rank, whdr_ce, center]
+    loss_warmup_epochs: 5
+    image_size: 256
+    batch_size: 64
+  phase4:
+    epochs: [21, 30]
+    active_losses: [mrae, entropy, normal, shading_regularization, saw_shading, rank, whdr_ce, center, cycle, perceptual]
+    image_size: 384
+    batch_size: 32
+    loss_warmup_epochs: 3
+  phase5:
+    epochs: [31, 40]
+    active_losses: [mrae, entropy, normal, shading_regularization, saw_shading, rank, whdr_ce, center, cycle, perceptual]
+    image_size: 512
+    batch_size: 16
+    lr: 5.0e-5
+
+data:
+  preprocessed_path: ./preprocess_data/
+  cgintrinsics_path: ./data/cgintrinsics/
+  hypersim_path: ./data/hypersim/
+  iiw_path: ./data/iiw/
+  saw_path: ./data/saw/
+  image_size: 256
+  hypersim_num_scenes: 100
+
+reflectance_sources:
+  default: R2
+  iiw: calibrated
+  cgintrinsics: R2
+  hypersim: R2
+  saw: R2
+
+evaluation:
+  checkpoint: ./checkpoints/weights.pth
+  dataset: all
+  whdr_delta: 0.10
+  bootstrap_samples: 1000
+  bootstrap_seed: 42
+  val_ratio: 0.2
+
+rank_loss:
+  reflectance_source: calibrated
+  loss_space: log_ratio
+  ratio_delta: 0.10
+  hard_pair_weight: 1.0
+  boundary_weight: 1.0
+  max_pair_weight: 3.0
+  margin_eq: 4.0e-2
+  margin_ineq: 0.2
+  ineq_weight: 1.0
+
+reflectance_loss:
+  reflectance_source: R2
+
+checkpoint_selection:
+  enabled: true
+  eval_interval_epochs: 5
+  weights:
+    whdr: 0.55
+    cgintrinsics_mse: 0.15
+    hypersim_refl_mse: 0.15
+    saw_error: 0.15
+  references:
+    whdr: 0.1018
+    cgintrinsics_mse: 0.037764
+    hypersim_refl_mse: 0.033454
+    saw_error: 0.047051
+
+ablation:
+  output_dir: ./results/ablation/
+  skip_completed: true
+  bootstrap_samples: 1000
+
+logging:
+  log_dir: ./log/
+  checkpoint_dir: ./checkpoints/
+  save_interval_epochs: 5
+  eval_interval_epochs: 1
+  print_batch_progress: true
